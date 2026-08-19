@@ -18,20 +18,25 @@ export function SocketProvider({ children }) {
       return;
     }
 
-    // Only create ONE socket connection for the entire admin session,
-    // regardless of how many pages get mounted/unmounted while navigating
-    if (!socketRef.current) {
-      socketRef.current = io(import.meta.env.VITE_API_URL.replace("/api", ""), {
+   if (!socketRef.current) {
+      // 1. Safe extraction of base domain without trailing /api
+      const rawUrl = import.meta.env.VITE_API_URL || "https://mdm-backend-production-4db1.up.railway.app/api";
+      const socketUrl = rawUrl.replace(/\/api\/?$/, "");
+
+      // 2. Initialize Socket instance
+      const socketInstance = io(socketUrl, {
         withCredentials: true,
+        transports: ["websocket", "polling"],
       });
+
+      socketRef.current = socketInstance;
+      setSocket(socketInstance);
     }
 
     return () => {
-      // Deliberately NOT disconnecting here - this cleanup runs on every
-      // navigation/re-render, and we want the connection to persist across
-      // pages. Real disconnect only happens above, when admin becomes null.
+      // Persists across page navigation while logged in
     };
-  }, [admin]);
+    }, [admin]);
 
   return (
     <SocketContext.Provider value={socketRef.current}>
