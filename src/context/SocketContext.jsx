@@ -6,14 +6,15 @@ const SocketContext = createContext(null);
 
 export function SocketProvider({ children }) {
   const { admin } = useAuth();
+  const [socket, setSocket] = useState(null);
   const socketRef = useRef(null);
 
   useEffect(() => {
     if (!admin) {
-      // Logged out - make sure any existing connection is closed
       if (socketRef.current) {
         socketRef.current.disconnect();
         socketRef.current = null;
+        setSocket(null);
       }
       return;
     }
