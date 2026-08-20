@@ -2,6 +2,7 @@ import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-cluster";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { useNavigate } from "react-router-dom";
 
 const PAKISTAN_CENTER = [30.3753, 69.3451];
 const PAKISTAN_DEFAULT_ZOOM = 6;
@@ -29,8 +30,7 @@ const inactiveIcon = new L.Icon({
 });
 
 const isDeviceActive = (device) => {
-  if (!device.lastPingAt) return false;
-  return Date.now() - new Date(device.lastPingAt).getTime() < ACTIVE_THRESHOLD_MS;
+  return Boolean(device.isOnline);
 };
 
 const createClusterIcon = (cluster) => {
@@ -72,10 +72,12 @@ const createClusterIcon = (cluster) => {
 };
 
 export default function DeviceMap({ devices }) {
+
+  const navigate = useNavigate();
   const withLocation = devices.filter((d) => d.lastKnownLocation?.lat);
 
   const clusterKey = withLocation
-    .map((d) => `${d._id}-${d.lastKnownLocation.lat}-${d.lastKnownLocation.lng}-${d.lastPingAt}`)
+    .map((d) => `${d._id}-${d.isOnline}-${d.lastKnownLocation.lat}-${d.lastKnownLocation.lng}`)
     .join("|");
 
   return (
@@ -83,7 +85,7 @@ export default function DeviceMap({ devices }) {
       <div className="absolute bottom-2 left-2 z-300 bg-white rounded-md shadow-sm border border-slate-200 px-3 py-2 text-xs space-y-1">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-blue-600" />
-          <span className="text-slate-700">Active (pinged within 15 min)</span>
+          <span className="text-slate-700">Active (Socket connected)</span>
         </div>
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-slate-400" />
@@ -112,15 +114,35 @@ export default function DeviceMap({ devices }) {
                 position={[device.lastKnownLocation.lat, device.lastKnownLocation.lng]}
                 icon={active ? activeIcon : inactiveIcon}
               >
-                <Popup>
-                  <strong>{device.employeeName}</strong><br />
-                  Status: {active ? "🟢 Active" : "⚪ Inactive"}<br />
-                  Compliance: {device.isCompliant ? "Compliant" : "Non-Compliant"}<br />
-                  Last ping: {device.lastPingAt ? new Date(device.lastPingAt).toLocaleString() : "Never"}
-                </Popup>
+              
+            <Popup>
+              <div className="p-1 space-y-1.5">
+                
+                <button
+                  onClick={() => navigate(`/devices/${device._id}`)}
+                  className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline text-left block"
+                >
+                  {device.employeeName || "Unnamed Device"} →
+                </button>
+                
+                <div className="text-xs text-slate-600 space-y-0.5">
+                  <div>Status: {device.isOnline ? "🟢 Online" : "🔴 Offline"}</div>
+                  <div>Compliance: {device.isCompliant ? "Compliant" : "Non-Compliant"}</div>
+                  <div>Last ping: {device.lastPingAt ? new Date(device.lastPingAt).toLocaleString() : "Never"}</div>
+                </div>
+ 
+                <button
+                  onClick={() => navigate(`/devices/${device._id}`)}
+                  className="mt-2 w-full px-2 py-1 bg-slate-900 text-white text-xs font-medium rounded hover:bg-slate-800 transition-colors"
+                >
+                  View Device Details
+                </button>
+              </div>
+            </Popup>
               </Marker>
             );
           })}
+          
         </MarkerClusterGroup>
       </MapContainer>
     </div>

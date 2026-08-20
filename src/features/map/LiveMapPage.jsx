@@ -11,69 +11,74 @@ export default function LiveMapPage() {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-  if (!socket) return;
+    if (!socket) return;
 
-  const handleUpdate = (updatedDevice) => {
-    
-     queryClient.setQueriesData({ queryKey: ["devices"] }, (oldData) => {
-      if (!oldData) return oldData;
+    // Helper to merge updated fields into cached devices
+    const updateCache = (updatedDevice) => {
+      queryClient.setQueriesData({ queryKey: ["devices"] }, (oldData) => {
+        if (!oldData) return oldData;
 
-      // Normalize array structure: handle both `{ devices: [...] }` and raw `[...]`
-      let deviceList = [];
-      if (Array.isArray(oldData)) {
-        deviceList = oldData;
-      } else if (Array.isArray(oldData.devices)) {
-        deviceList = oldData.devices;
-      } else {
-        return oldData; // Unexpected shape, skip
-      }
+        let deviceList = [];
+        if (Array.isArray(oldData)) {
+          deviceList = oldData;
+        } else if (Array.isArray(oldData.devices)) {
+          deviceList = oldData.devices;
+        } else {
+          return oldData;
+        }
 
-      // Flexibly match using String conversion of _id OR deviceId
-      const targetId = String(updatedDevice._id || updatedDevice.id);
-      const targetDevId = String(updatedDevice.deviceId);
+        const targetId = String(updatedDevice._id || updatedDevice.id);
+        const targetDevId = String(updatedDevice.deviceId);
 
-      const exists = deviceList.some(
-        (d) => String(d._id) === targetId || String(d.deviceId) === targetDevId
-      );
+        const exists = deviceList.some(
+          (d) => String(d._id) === targetId || String(d.deviceId) === targetDevId
+        );
 
-      let updatedList;
-      if (exists) {
-        // Merge the incoming socket properties into the existing device object
-        updatedList = deviceList.map((d) => {
-          if (String(d._id) === targetId || String(d.deviceId) === targetDevId) {
-            return {
-              ...d,
-              ...updatedDevice,
-              // Ensure location is properly overwritten
-              lastKnownLocation: {
-                ...d.lastKnownLocation,
-                ...updatedDevice.lastKnownLocation,
-              },
-            };
-          }
-          return d;
-        });
-      } else {
-        // If it's a brand new device, append it to the list
-        updatedList = [...deviceList, updatedDevice];
-      }
+        let updatedList;
+        if (exists) {
+          updatedList = deviceList.map((d) => {
+            if (String(d._id) === targetId || String(d.deviceId) === targetDevId) {
+              return {
+                ...d,
+                ...updatedDevice,
+                lastKnownLocation: {
+                  ...d.lastKnownLocation,
+                  ...updatedDevice.lastKnownLocation,
+                },
+              };
+            }
+            return d;
+          });
+        } else {
+          updatedList = [...deviceList, updatedDevice];
+        }
 
-      // Reconstruct cache data with updated device array
-      return Array.isArray(oldData)
-        ? updatedList
-        : { ...oldData, devices: updatedList };
-    });
+        return Array.isArray(oldData)
+          ? updatedList
+          : { ...oldData, devices: updatedList };
+      });
 
-    // Keep statistics cards fresh
-    queryClient.invalidateQueries({ queryKey: ["deviceStats"] });
-  };
+      queryClient.invalidateQueries({ queryKey: ["deviceStats"] });
+    };
 
-  socket.on("device-update", handleUpdate); 
+    // 1. Listen for full ping updates (Location, permissions, compliance)
+    const handleDeviceUpdate = (updatedDevice) => {
+      updateCache(updatedDevice);
+    };
 
-  return () => {
-    socket.off("device-update", handleUpdate); 
-  };
-}, [socket, queryClient]);
+    // 2. Listen for online/offline toggle events from server.js
+    const handleStatusChange = ({ _id, deviceId, isOnline }) => {
+      updateCache({ _id, deviceId, isOnline });
+    };
+
+    socket.on("device-update", handleDeviceUpdate);
+    socket.on("device-status-changed", handleStatusChange);
+
+    return () => {
+      socket.off("device-update", handleDeviceUpdate);
+      socket.off("device-status-changed", handleStatusChange);
+    };
+  }, [socket, queryClient]);
 
   if (isLoading) {
     return (
@@ -93,7 +98,7 @@ export default function LiveMapPage() {
 
   const devices = data?.devices || [];
   const locatedCount = devices.filter((d) => d.lastKnownLocation?.lat).length;
-
+  const onlineCount = devices.filter((d) => d.isOnline).length;
   return (
     <div className="space-y-4">
       {/* Page Title Header */}
@@ -106,10 +111,12 @@ export default function LiveMapPage() {
         {/* Real-time Indicator Badges */}
         <div className="flex items-center gap-3">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold rounded-full">
-            <Radio size={14} className="animate-pulse text-emerald-600" /> Socket Active
+            <Radio size={14} className="animate-pulse text-emerald-600" />
+            {onlineCount} Online
           </span>
           <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-slate-100 text-slate-700 text-xs font-bold rounded-full">
-            <MapPin size={14} className="text-slate-500" /> {locatedCount} / {devices.length} Devices Mapped
+            <MapPin size={14} className="text-slate-500" />
+            {locatedCount} / {devices.length} Devices Mapped
           </span>
         </div>
       </div>
