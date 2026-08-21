@@ -49,7 +49,7 @@ export default function MediaLogsTab({ mediaLogs = [], filterType = "photo" }) {
             </div>
 
             {/* Media Display Container */}
-            <div className="rounded-lg overflow-hidden bg-slate-900 border border-slate-200 flex items-center justify-center min-h-[140px]">
+            <div className="rounded-lg overflow-hidden bg-slate-900 border border-slate-200 flex items-center justify-center min-h-35">
               {isPhoto ? (
                 mediaUrl ? (
                   <img
