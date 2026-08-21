@@ -1,11 +1,11 @@
 import React from "react";
 import { Camera, Mic, Image as ImageIcon, Volume2, Calendar } from "lucide-react";
 
-export default function MediaLogsTab({ mediaLogs = [] }) {
+export default function MediaLogsTab({ mediaLogs = [], filterType = "photo" }) {
   if (!mediaLogs || mediaLogs.length === 0) {
     return (
       <div className="py-8 text-center text-slate-500 text-xs">
-        No captured photos or audio recordings found for this device.
+        No {filterType === "photo" ? "captured photos" : "audio recordings"} logged yet.
       </div>
     );
   }
@@ -13,9 +13,17 @@ export default function MediaLogsTab({ mediaLogs = [] }) {
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {mediaLogs.map((item, index) => {
-        const isPhoto = item.type === "photo" || item.commandType === "capture_photo";
-        const mediaUrl = item.payloadUrl || item.url;
-        const dateStr = item.createdAt ? new Date(item.createdAt).toLocaleString() : "Recently";
+        // Explicitly check item properties or fall back to filterType prop
+        const isPhoto =
+          filterType === "photo" ||
+          item.type === "photo" ||
+          item.mediaType === "photo" ||
+          item.commandType === "capture_photo";
+
+        const mediaUrl = item.payloadUrl || item.url || item.fileUri;
+        const dateStr = item.createdAt
+          ? new Date(item.createdAt).toLocaleString()
+          : "Recently";
 
         return (
           <div
@@ -41,7 +49,7 @@ export default function MediaLogsTab({ mediaLogs = [] }) {
             </div>
 
             {/* Media Display Container */}
-            <div className="rounded-lg overflow-hidden bg-slate-900 border border-slate-200 flex items-center justify-center min-h-35">
+            <div className="rounded-lg overflow-hidden bg-slate-900 border border-slate-200 flex items-center justify-center min-h-[140px]">
               {isPhoto ? (
                 mediaUrl ? (
                   <img
@@ -57,7 +65,7 @@ export default function MediaLogsTab({ mediaLogs = [] }) {
               ) : mediaUrl ? (
                 <div className="w-full p-3 space-y-2 text-center">
                   <Volume2 size={24} className="text-emerald-400 mx-auto" />
-                  <audio controls className="w-full h-8">
+                  <audio controls key={mediaUrl} className="w-full h-8">
                     <source src={mediaUrl} />
                     Your browser does not support audio playback.
                   </audio>

@@ -7,7 +7,7 @@ import PermissionHistoryTab from "./components/PermissionHistoryTab";
 import EditDeviceForm from "./components/EditDeviceForm";
 import CommandPanel from "./components/CommandPanel";
 import PromoteToAdminButton from "./components/PromoteToAdminButton";
-import { ArrowLeft, MapPin, Shield, Smartphone, Mail, Camera } from "lucide-react";
+import { ArrowLeft, MapPin, Shield, Smartphone, Mail, Camera,Mic } from "lucide-react";
 import MediaLogsTab from "./components/MediaLogsTab";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react"; 
@@ -16,26 +16,68 @@ import { useSocket } from "../../context/SocketContext";
 export default function DeviceDetailPage() {
   const { id } = useParams();
   const [tab, setTab] = useState("location");
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const queryClient = useQueryClient();
   const { data, isLoading, isError } = useDeviceHistory(id);
    const socket = useSocket();
 
+ 
   useEffect(() => {
-    if (!socket) return;
+   
+    if (!socket) {
+       return;
+    }
+    const isMatchingDevice = (payload) => {
+      if (!payload) return false;
+      const targetId = String(payload.deviceId || payload.targetDeviceId || payload._id || payload.id || "");
+      const currentId = String(id);
+      
+      return targetId === currentId || (data?.device?._id && targetId === String(data.device._id));
+    }
 
-    const handleCommandResult = (payload) => {
-      // Re-fetch history if command belongs to this device and was executed successfully
-      if (payload?.deviceId === id || payload?.status === "executed") {
-        queryClient.invalidateQueries(["deviceHistory", id]);
-      }
-    };
+    const handleProgressUpdate = (payload) => {
+        
+        if (!isMatchingDevice(payload)) return;
 
-    socket.on("command-result-received", handleCommandResult);
+        const status = String(payload?.status || payload?.commandStatus || payload?.state || "").toLowerCase();
+        const action = String(payload?.action || payload?.commandType || payload?.type || payload?.command || "").toLowerCase();
+
+        // If status indicates active/in-progress and action relates to audio
+        const isAudioAction = action.includes("audio") || action.includes("record");
+        const isActiveStatus = ["recording", "pending", "sent", "started", "processing"].includes(status);
+
+        if (isAudioAction && isActiveStatus) {
+          setIsRecordingAudio(true);
+        }
+      };
+
+    const handleResultUpdate = (payload) => {
+        
+        if (!isMatchingDevice(payload)) return;
+
+        const status = String(payload?.status || payload?.commandStatus || "").toLowerCase();
+        const isFinished = ["executed", "completed", "failed", "success", "done"].includes(status);
+
+        if (isFinished) {
+          setIsRecordingAudio(false);
+          queryClient.invalidateQueries(["deviceHistory", id]);
+        }
+      };
+
+    socket.on("command-progress", handleProgressUpdate);
+    socket.on("command-status", handleProgressUpdate);
+    socket.on("command-sent", handleProgressUpdate);
+    socket.on("command-result-received", handleResultUpdate);
+    socket.on("command-executed", handleResultUpdate);
 
     return () => {
-      socket.off("command-result-received", handleCommandResult);
+      socket.off("command-progress", handleProgressUpdate);
+      socket.off("command-status", handleProgressUpdate);
+      socket.off("command-sent", handleProgressUpdate);
+      socket.off("command-result-received", handleResultUpdate);
+      socket.off("command-executed", handleResultUpdate);
     };
-  }, [id, queryClient,socket]);
+  }, [id, queryClient, socket, data?.device?._id]);
 
   if (isLoading) {
     return (
@@ -54,7 +96,20 @@ export default function DeviceDetailPage() {
   }
 
   const { device, locationHistory = [], permissionHistory = [] ,mediaLogs = []} = data;
+  
+  const photoLogs = mediaLogs.filter((item) => 
+    item.mediaType === "photo" || 
+    item.type === "photo" || 
+    item.commandType === "capture_photo" ||
+    item.action === "capture_photo"
+  );
 
+  const audioLogs = mediaLogs.filter((item) => 
+    item.mediaType === "audio" || 
+    item.type === "audio" || 
+    item.commandType === "record_audio" ||
+    item.action === "record_audio"
+  );
   return (
     <div className="space-y-6">
       {/* Top Header Nav */}
@@ -89,7 +144,28 @@ export default function DeviceDetailPage() {
         {/* Left Column (2 Cols) */}
         <div className="lg:col-span-2 space-y-6">
           {/* Quick Remote Commands */}
-          <CommandPanel deviceId={device._id} />
+          <CommandPanel 
+              deviceId={device._id} 
+              onCommandSent={(commandType) => {
+                if (commandType === "record_audio" || commandType === "AUDIO_RECORDING") {
+                  setIsRecordingAudio(true);
+                }
+              }}
+            />
+
+
+          {/* Real-time Audio Recording Alert Banner */}
+          {isRecordingAudio && (
+            <div className="flex items-center gap-3 p-3.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs animate-pulse">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+              <span>
+                <strong>Audio Recording in Progress:</strong> The target device is capturing audio. Logs will update automatically when uploaded.
+              </span>
+            </div>
+          )}
 
           {/* Activity Logs Card */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
@@ -119,14 +195,25 @@ export default function DeviceDetailPage() {
               </button>
 
               <button
-                onClick={() => setTab("media")}
+                onClick={() => setTab("photos")}
                 className={`flex items-center gap-2 px-5 py-3 text-xs font-bold transition border-b-2 ${
-                  tab === "media"
+                  tab === "photos"
                     ? "border-blue-600 text-blue-600 bg-white"
                     : "border-transparent text-slate-500 hover:text-slate-700"
                 }`}
               >
-                <Camera size={15} /> Captured Media ({mediaLogs.length})
+                <Camera size={15} /> Photos ({photoLogs.length})
+              </button>
+
+              <button
+                onClick={() => setTab("audio")}
+                className={`flex items-center gap-2 px-5 py-3 text-xs font-bold transition border-b-2 ${
+                  tab === "audio"
+                    ? "border-blue-600 text-blue-600 bg-white"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Mic size={15} /> Audio ({audioLogs.length})
               </button>
             </div>
 
@@ -134,9 +221,9 @@ export default function DeviceDetailPage() {
             <div className="p-5">
                 {tab === "location" && <LocationHistoryTab history={locationHistory} />}
                 {tab === "permissions" && <PermissionHistoryTab history={permissionHistory} />}
-                {tab === "media" && <MediaLogsTab mediaLogs={mediaLogs} />} {/* 👈 ADD MEDIA TAB BODY */}
-              </div>
-          </div>
+                {tab === "photos" && <MediaLogsTab mediaLogs={photoLogs} filterType="photo" />}
+                {tab === "audio" && <MediaLogsTab mediaLogs={audioLogs} filterType="audio" />} </div>
+            </div>
         </div>
 
         {/* Right Column (1 Col) */}
