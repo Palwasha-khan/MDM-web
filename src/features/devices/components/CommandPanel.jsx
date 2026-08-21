@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { sendCommand } from "../../../api/endpoints/deviceApi";
 import toast from "react-hot-toast";
-import { BellRing, Lock, AlertTriangle, Loader2 } from "lucide-react";
+import { BellRing, Lock, AlertTriangle, Loader2, Camera, Mic } from "lucide-react";
 
 const commands = [
   { 
@@ -21,6 +21,18 @@ const commands = [
     label: "Compliance Warning", 
     icon: AlertTriangle, 
     badgeClass: "bg-orange-500/10 text-orange-700 border-orange-300 hover:bg-orange-500 hover:text-white" 
+  },
+  { 
+    type: "capture_photo", 
+    label: "Take Photo", 
+    icon: Camera, 
+    badgeClass: "bg-blue-500/10 text-blue-700 border-blue-300 hover:bg-blue-600 hover:text-white" 
+  },
+  { 
+    type: "record_audio", 
+    label: "Record Audio (10s)", 
+    icon: Mic, 
+    badgeClass: "bg-emerald-500/10 text-emerald-700 border-emerald-300 hover:bg-emerald-600 hover:text-white" 
   },
 ];
 

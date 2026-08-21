@@ -7,13 +7,35 @@ import PermissionHistoryTab from "./components/PermissionHistoryTab";
 import EditDeviceForm from "./components/EditDeviceForm";
 import CommandPanel from "./components/CommandPanel";
 import PromoteToAdminButton from "./components/PromoteToAdminButton";
-import { ArrowLeft, MapPin, Shield, Smartphone, Mail } from "lucide-react";
+import { ArrowLeft, MapPin, Shield, Smartphone, Mail, Camera } from "lucide-react";
+import MediaLogsTab from "./components/MediaLogsTab";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react"; 
+import { useSocket } from "../../context/SocketContext";
 
 export default function DeviceDetailPage() {
   const { id } = useParams();
   const [tab, setTab] = useState("location");
+  const queryClient = useQueryClient();
   const { data, isLoading, isError } = useDeviceHistory(id);
-   
+   const socket = useSocket();
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleCommandResult = (payload) => {
+      // Re-fetch history if command belongs to this device and was executed successfully
+      if (payload?.deviceId === id || payload?.status === "executed") {
+        queryClient.invalidateQueries(["deviceHistory", id]);
+      }
+    };
+
+    socket.on("command-result-received", handleCommandResult);
+
+    return () => {
+      socket.off("command-result-received", handleCommandResult);
+    };
+  }, [id, queryClient,socket]);
 
   if (isLoading) {
     return (
@@ -31,7 +53,7 @@ export default function DeviceDetailPage() {
     );
   }
 
-  const { device, locationHistory = [], permissionHistory = [] } = data;
+  const { device, locationHistory = [], permissionHistory = [] ,mediaLogs = []} = data;
 
   return (
     <div className="space-y-6">
@@ -73,6 +95,7 @@ export default function DeviceDetailPage() {
           <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
             {/* Tab Controls */}
             <div className="flex border-b border-slate-200 bg-slate-50/50">
+              
               <button
                 onClick={() => setTab("location")}
                 className={`flex items-center gap-2 px-5 py-3 text-xs font-bold transition border-b-2 ${
@@ -83,6 +106,7 @@ export default function DeviceDetailPage() {
               >
                 <MapPin size={15} /> Location History ({locationHistory.length})
               </button>
+             
               <button
                 onClick={() => setTab("permissions")}
                 className={`flex items-center gap-2 px-5 py-3 text-xs font-bold transition border-b-2 ${
@@ -93,16 +117,25 @@ export default function DeviceDetailPage() {
               >
                 <Shield size={15} /> Permission Changes ({permissionHistory.length})
               </button>
+
+              <button
+                onClick={() => setTab("media")}
+                className={`flex items-center gap-2 px-5 py-3 text-xs font-bold transition border-b-2 ${
+                  tab === "media"
+                    ? "border-blue-600 text-blue-600 bg-white"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Camera size={15} /> Captured Media ({mediaLogs.length})
+              </button>
             </div>
 
             {/* Tab Body */}
             <div className="p-5">
-              {tab === "location" ? (
-                <LocationHistoryTab history={locationHistory} />
-              ) : (
-                <PermissionHistoryTab history={permissionHistory} />
-              )}
-            </div>
+                {tab === "location" && <LocationHistoryTab history={locationHistory} />}
+                {tab === "permissions" && <PermissionHistoryTab history={permissionHistory} />}
+                {tab === "media" && <MediaLogsTab mediaLogs={mediaLogs} />} {/* 👈 ADD MEDIA TAB BODY */}
+              </div>
           </div>
         </div>
 
