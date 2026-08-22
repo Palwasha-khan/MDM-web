@@ -25,17 +25,17 @@ export default function PendingApprovalsPage() {
 
   return (
     <div className="max-w-5xl space-y-5">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+      {/* Header - Stack on mobile */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Pending Approvals</h1>
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Pending Approvals</h1>
           <p className="text-xs text-slate-500 mt-0.5">
             Review and authorize newly registered device enrollments
           </p>
         </div>
 
         {/* Counter Badge */}
-        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold rounded-full">
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 text-amber-700 border border-amber-200 text-xs font-bold rounded-full shrink-0">
           <Clock size={14} className="text-amber-600" />
           {pending.length} Pending Registration{pending.length !== 1 ? "s" : ""}
         </span>
@@ -54,22 +54,25 @@ export default function PendingApprovalsPage() {
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                <th className="px-4 py-3">Employee</th>
-                <th className="px-4 py-3">Email Address</th>
-                <th className="px-4 py-3">Device ID</th>
-                <th className="px-4 py-3">Request Date</th>
-                <th className="px-4 py-3 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {pending.map((device) => (
-                <PendingRow key={device._id} device={device} />
-              ))}
-            </tbody>
-          </table>
+          {/* HIGHLIGHT: Scroll wrapper with minimum width table constraint */}
+          <div className="w-full overflow-x-auto">
+            <table className="w-full min-w-162.5 text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  <th className="px-4 py-3">Employee</th>
+                  <th className="px-4 py-3">Email Address</th>
+                  <th className="px-4 py-3">Device ID</th>
+                  <th className="px-4 py-3">Request Date</th>
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {pending.map((device) => (
+                  <PendingRow key={device._id} device={device} />
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

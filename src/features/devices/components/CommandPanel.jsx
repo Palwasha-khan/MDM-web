@@ -9,6 +9,8 @@ const commands = [
     label: "Fetch Live Location", 
     icon: MapPin, 
     targetTab: "live-map",
+    requiresOnline: true,
+    permissionKey: "location",
     badgeClass: "bg-purple-500/10 text-purple-700 border-purple-300 hover:bg-purple-600 hover:text-white" 
   },
   { 
@@ -16,6 +18,8 @@ const commands = [
     label: "Take Photo", 
     icon: Camera, 
     targetTab: "photos",
+    requiresOnline: true,
+    permissionKey: "camera", 
     badgeClass: "bg-blue-500/10 text-blue-700 border-blue-300 hover:bg-blue-600 hover:text-white" 
   },
   { 
@@ -23,6 +27,8 @@ const commands = [
     label: "Record Audio (10s)", 
     icon: Mic, 
     targetTab: "audio",
+    requiresOnline: true,
+    permissionKey: "microphone",
     badgeClass: "bg-emerald-500/10 text-emerald-700 border-emerald-300 hover:bg-emerald-600 hover:text-white" 
   },
   { 
@@ -30,6 +36,7 @@ const commands = [
     label: "Lock Warning", 
     icon: Lock, 
     targetTab: null,
+    requiresOnline: false,
     badgeClass: "bg-rose-500/10 text-rose-700 border-rose-300 hover:bg-rose-600 hover:text-white" 
   },
   { 
@@ -37,25 +44,35 @@ const commands = [
     label: "Compliance Warning", 
     icon: AlertTriangle,
     targetTab: null, 
+    requiresOnline: false,
     badgeClass: "bg-orange-500/10 text-orange-700 border-orange-300 hover:bg-orange-500 hover:text-white" 
   },
 ];
 
-export default function CommandPanel({ deviceId, onCommandSent, onTabChange }) {
+export default function CommandPanel({ deviceId, isOnline,permissions = {}, onTabChange, onCommandSent }) {
   const [sending, setSending] = useState(null);
 
-  const handleSend = async (cmd) => {
+  const handleSend = async (cmd) => { 
+
+    if (cmd.requiresOnline && !isOnline) {
+      toast.error(`Cannot execute "${cmd.label}": Device is offline.`);
+      return;
+    }
+
+    if (cmd.permissionKey && permissions[cmd.permissionKey] === false) {
+      toast.error(`Cannot execute "${cmd.label}": ${cmd.permissionKey} permission is disabled on the device.`);
+      return;
+    }
+
     setSending(cmd.type);
     try {
       await sendCommand(deviceId, cmd.type);
       toast.success("Command dispatched to device");
 
-      // Notify parent component about command execution
       if (typeof onCommandSent === "function") {
         onCommandSent(cmd.type);
       }
 
-      // Automatically switch active tab if a targetTab exists
       if (cmd.targetTab && typeof onTabChange === "function") {
         onTabChange(cmd.targetTab);
       }
@@ -77,13 +94,26 @@ export default function CommandPanel({ deviceId, onCommandSent, onTabChange }) {
         {commands.map((cmd) => {
           const Icon = cmd.icon;
           const isCurrentSending = sending === cmd.type;
+          const isButtonDisabled = sending !== null || (cmd.requiresOnline && !isOnline);
+          const isPermissionDenied = cmd.permissionKey && permissions[cmd.permissionKey] === false;
+ 
+          const buttonTooltip = !isOnline && cmd.requiresOnline
+            ? "Device is offline"
+            : isPermissionDenied
+            ? `${cmd.permissionKey} permission denied on device`
+            : "";
 
           return (
             <button
               key={cmd.type}
               onClick={() => handleSend(cmd)}
-              disabled={sending !== null}
-              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold border rounded-lg transition-all duration-150 disabled:opacity-40 ${cmd.badgeClass}`}
+              disabled={isButtonDisabled}
+              title={buttonTooltip}
+              className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold border rounded-lg transition-all duration-150 ${
+                isButtonDisabled
+                  ? "opacity-50 cursor-not-allowed bg-slate-100 text-slate-400 border-slate-200" 
+                  : cmd.badgeClass
+              } ${sending !== null ? "disabled:opacity-40" : ""}`}
             >
               {isCurrentSending ? (
                 <Loader2 size={14} className="animate-spin" />

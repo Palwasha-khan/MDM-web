@@ -9,6 +9,7 @@ export function useDeviceHistory(id) {
       return data;
     },
     enabled: !!id,
-    refetchInterval: 10000,
+    staleTime: 1000 * 60 * 2, 
+    refetchOnWindowFocus: false,
   });
 }

@@ -30,7 +30,7 @@ export default function SettingsPage() {
         >
           <User size={16} /> Account & Security
         </button>
-        <button
+        {/* <button
           onClick={() => setActiveTab("policies")}
           className={`pb-3 flex items-center gap-2 border-b-2 transition ${
             activeTab === "policies"
@@ -39,7 +39,7 @@ export default function SettingsPage() {
           }`}
         >
           <ShieldCheck size={16} /> MDM System Policies
-        </button>
+        </button> */}
       </div>
 
       {/* Tab 1: Account Profile & Password Form */}
@@ -83,7 +83,7 @@ export default function SettingsPage() {
       )}
 
       {/* Tab 2: System MDM Policies */}
-      {activeTab === "policies" && <MdmPoliciesForm />}
+      {/* {activeTab === "policies" && <MdmPoliciesForm />} */}
     </div>
   );
 }

@@ -8,7 +8,6 @@ export default function PendingRow({ device }) {
   const [showRejectConfirm, setShowRejectConfirm] = useState(false);
   const queryClient = useQueryClient();
 
-  // Approve Mutation
   const approveMutation = useMutation({
     mutationFn: () => approveDevice(device._id),
     onSuccess: () => {
@@ -22,7 +21,6 @@ export default function PendingRow({ device }) {
     },
   });
 
-  // Reject Mutation
   const rejectMutation = useMutation({
     mutationFn: () => rejectDevice(device._id),
     onSuccess: () => {
@@ -48,8 +46,8 @@ export default function PendingRow({ device }) {
             <div className="h-9 w-9 rounded-full bg-blue-50 text-blue-700 font-bold text-xs flex items-center justify-center shrink-0 border border-blue-100 uppercase">
               {device.employeeName ? device.employeeName.charAt(0) : "E"}
             </div>
-            <div>
-              <p className="font-semibold text-slate-800 text-xs">{device.employeeName}</p>
+            <div className="min-w-0">
+              <p className="font-semibold text-slate-800 text-xs truncate">{device.employeeName}</p>
               <p className="text-[11px] text-slate-400">MDM Enrollee</p>
             </div>
           </div>
@@ -57,16 +55,16 @@ export default function PendingRow({ device }) {
 
         {/* Email */}
         <td className="px-4 py-3.5 text-xs text-slate-600">
-          <span className="inline-flex items-center gap-1.5">
-            <Mail size={14} className="text-slate-400" />
+          <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
+            <Mail size={14} className="text-slate-400 shrink-0" />
             {device.email}
           </span>
         </td>
 
         {/* Device Hardware Identifier */}
         <td className="px-4 py-3.5">
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 font-mono text-[11px] font-medium rounded-md border border-slate-200">
-            <Smartphone size={12} className="text-slate-400" />
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 text-slate-700 font-mono text-[11px] font-medium rounded-md border border-slate-200 whitespace-nowrap">
+            <Smartphone size={12} className="text-slate-400 shrink-0" />
             {device.deviceId}
           </span>
         </td>
@@ -112,12 +110,12 @@ export default function PendingRow({ device }) {
       {showRejectConfirm && (
         <tr className="bg-rose-50/60 border-t border-rose-100">
           <td colSpan={5} className="px-4 py-3">
-            <div className="flex items-center justify-between text-xs text-rose-800">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs text-rose-800">
               <span className="flex items-center gap-2 font-medium">
-                <AlertTriangle size={15} className="text-rose-600" />
+                <AlertTriangle size={15} className="text-rose-600 shrink-0" />
                 Are you sure you want to reject <strong>{device.employeeName}</strong>?
               </span>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 self-end sm:self-auto">
                 <button
                   onClick={() => rejectMutation.mutate()}
                   disabled={rejectMutation.isPending}

