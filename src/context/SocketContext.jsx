@@ -31,14 +31,14 @@ export function SocketProvider({ children }) {
         transports: ["websocket", "polling"],
       });
 
+      socketInstance.on("connect", () => {
+        socketInstance.emit("register-admin", admin.id || admin._id);
+      });
+
       socketRef.current = socketInstance;
       setSocket(socketInstance);
     }
-
-    return () => {
-      // Persists across page navigation while logged in
-    };
-    }, [admin]);
+  }, [admin]);
 
   return (
     <SocketContext.Provider value={socketRef.current}>

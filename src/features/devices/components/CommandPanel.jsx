@@ -1,49 +1,64 @@
 import { useState } from "react";
 import { sendCommand } from "../../../api/endpoints/deviceApi";
 import toast from "react-hot-toast";
-import { BellRing, Lock, AlertTriangle, Loader2, Camera, Mic } from "lucide-react";
+import { BellRing, Lock, AlertTriangle, Loader2, Camera, Mic, MapPin } from "lucide-react";
 
 const commands = [
   { 
-    type: "ring_alert", 
-    label: "Ring Alert", 
-    icon: BellRing, 
-    badgeClass: "bg-amber-500/10 text-amber-700 border-amber-300 hover:bg-amber-500 hover:text-white" 
-  },
-  { 
-    type: "lock_warning", 
-    label: "Lock Warning", 
-    icon: Lock, 
-    badgeClass: "bg-rose-500/10 text-rose-700 border-rose-300 hover:bg-rose-600 hover:text-white" 
-  },
-  { 
-    type: "compliance_warning", 
-    label: "Compliance Warning", 
-    icon: AlertTriangle, 
-    badgeClass: "bg-orange-500/10 text-orange-700 border-orange-300 hover:bg-orange-500 hover:text-white" 
+    type: "fetch_location", 
+    label: "Fetch Live Location", 
+    icon: MapPin, 
+    targetTab: "live-map",
+    badgeClass: "bg-purple-500/10 text-purple-700 border-purple-300 hover:bg-purple-600 hover:text-white" 
   },
   { 
     type: "capture_photo", 
     label: "Take Photo", 
     icon: Camera, 
+    targetTab: "photos",
     badgeClass: "bg-blue-500/10 text-blue-700 border-blue-300 hover:bg-blue-600 hover:text-white" 
   },
   { 
     type: "record_audio", 
     label: "Record Audio (10s)", 
     icon: Mic, 
+    targetTab: "audio",
     badgeClass: "bg-emerald-500/10 text-emerald-700 border-emerald-300 hover:bg-emerald-600 hover:text-white" 
+  },
+  { 
+    type: "lock_warning", 
+    label: "Lock Warning", 
+    icon: Lock, 
+    targetTab: null,
+    badgeClass: "bg-rose-500/10 text-rose-700 border-rose-300 hover:bg-rose-600 hover:text-white" 
+  },
+  { 
+    type: "compliance_warning", 
+    label: "Compliance Warning", 
+    icon: AlertTriangle,
+    targetTab: null, 
+    badgeClass: "bg-orange-500/10 text-orange-700 border-orange-300 hover:bg-orange-500 hover:text-white" 
   },
 ];
 
-export default function CommandPanel({ deviceId }) {
+export default function CommandPanel({ deviceId, onCommandSent, onTabChange }) {
   const [sending, setSending] = useState(null);
 
-  const handleSend = async (commandType) => {
-    setSending(commandType);
+  const handleSend = async (cmd) => {
+    setSending(cmd.type);
     try {
-      await sendCommand(deviceId, commandType);
+      await sendCommand(deviceId, cmd.type);
       toast.success("Command dispatched to device");
+
+      // Notify parent component about command execution
+      if (typeof onCommandSent === "function") {
+        onCommandSent(cmd.type);
+      }
+
+      // Automatically switch active tab if a targetTab exists
+      if (cmd.targetTab && typeof onTabChange === "function") {
+        onTabChange(cmd.targetTab);
+      }
     } catch (err) {
       toast.error(err.response?.data?.message || "Failed to send command");
     } finally {
@@ -66,7 +81,7 @@ export default function CommandPanel({ deviceId }) {
           return (
             <button
               key={cmd.type}
-              onClick={() => handleSend(cmd.type)}
+              onClick={() => handleSend(cmd)}
               disabled={sending !== null}
               className={`flex items-center gap-2 px-3.5 py-2 text-xs font-bold border rounded-lg transition-all duration-150 disabled:opacity-40 ${cmd.badgeClass}`}
             >
